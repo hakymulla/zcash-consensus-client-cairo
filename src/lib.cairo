@@ -38,12 +38,16 @@ pub use verification::{
     BlockVerificationResult,
     ChainVerificationResult,
     ScanResult,
+    verify_block_equihash,
+    validate_block_difficulty,
+    validate_block_merkle_roots,
 };
 
 // Data types
 pub use types::compact_block::{CompactBlock, CompactTx, CompactOutput, CompactOrchardAction, BlockHeight};
 pub use types::scan_range::{ScanRange, ScanPriority, ScanSummary};
 pub use types::balance::{AccountBalance, PoolBalance, WalletSummary, Zatoshi};
+pub use types::block_header::{BlockHeader, BlockHeaderMeta, BlockHeaderTrait};
 
 // Crypto primitives
 pub use crypto::note_encryption::{IncomingViewingKey, DecryptedNote};
