@@ -2,3 +2,4 @@
 
 pub mod errors;
 pub mod u256_helpers;
+pub mod blake_utils;

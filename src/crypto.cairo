@@ -2,6 +2,7 @@
 
 pub mod pedersen;
 pub mod blake2b;
+pub mod blake2bnew;
 pub mod note_encryption;
 pub mod nullifier;
 pub mod sha256;
