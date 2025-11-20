@@ -180,7 +180,7 @@ impl BlockHeaderImpl of BlockHeaderTrait {
 /// Helper function to create empty byte arrays
 fn empty_32_bytes() -> Array<u8> {
     let mut arr = ArrayTrait::new();
-    let mut i = 0;
+    let mut i: u32 = 0;
     loop {
         if i >= 32 {
             break;
@@ -194,7 +194,7 @@ fn empty_32_bytes() -> Array<u8> {
 /// Helper function to create empty solution array
 fn empty_solution() -> Array<u8> {
     let mut arr = ArrayTrait::new();
-    let mut i = 0;
+    let mut i: u32 = 0;
     loop {
         if i >= constants::EQUIHASH_SOLUTION_SIZE {
             break;
@@ -248,8 +248,13 @@ mod tests {
 
     #[test]
     fn test_validates_against_prev() {
-        let mut prev_hash = empty_32_bytes();
-        *prev_hash[0] = 0xAA;  // Distinctive hash
+        let mut prev_hash = ArrayTrait::new();
+        prev_hash.append(0xAA);  // Distinctive hash
+        let mut i: u32 = 1;
+        while i < 32 {
+            prev_hash.append(0);
+            i += 1;
+        };
 
         let prev_header = BlockHeader {
             version: 4,

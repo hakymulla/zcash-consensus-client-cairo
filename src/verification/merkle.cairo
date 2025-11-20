@@ -9,6 +9,7 @@
 use crate::types::block_header::BlockHeader;
 use crate::types::compact_block::{CompactBlock, CompactTx};
 use crate::utils::errors::ZcashError;
+use crate::crypto::sha256d;
 
 /// Transaction Merkle Tree Validation
 /// Uses SHA-256d (double SHA-256) like Bitcoin
@@ -36,7 +37,7 @@ pub fn compute_tx_merkle_root(
 
     // Single transaction - return its hash
     if tx_hashes.len() == 1 {
-        return Result::Ok(tx_hashes[0].clone());
+        return Result::Ok(copy_array(tx_hashes[0]));
     }
 
     // Build tree level by level
@@ -48,7 +49,7 @@ pub fn compute_tx_merkle_root(
         if i >= tx_hashes.len() {
             break;
         }
-        current_level.append(tx_hashes[i].clone());
+        current_level.append(copy_array(tx_hashes[i]));
         i += 1;
     };
 
@@ -60,23 +61,21 @@ pub fn compute_tx_merkle_root(
 
         let mut next_level: Array<Array<u8>> = ArrayTrait::new();
         let mut j: usize = 0;
+        let level_span = current_level.span();
 
         loop {
-            if j >= current_level.len() {
+            if j >= level_span.len() {
                 break;
             }
 
-            if j + 1 < current_level.len() {
-                // Hash pair
-                let left = current_level[j];
-                let right = current_level[j + 1];
-                let combined = hash_pair(@left, @right);
+            if j + 1 < level_span.len() {
+                // Hash pair (span indexing gives @T)
+                let combined = hash_pair(level_span[j], level_span[j + 1]);
                 next_level.append(combined);
                 j += 2;
             } else {
                 // Odd number - duplicate last element
-                let last = current_level[j];
-                let combined = hash_pair(@last, @last);
+                let combined = hash_pair(level_span[j], level_span[j]);
                 next_level.append(combined);
                 j += 1;
             }
@@ -85,39 +84,54 @@ pub fn compute_tx_merkle_root(
         current_level = next_level;
     };
 
-    Result::Ok(current_level[0].clone())
+    // Return the final root
+    let root_span = current_level.span();
+    Result::Ok(copy_array(root_span[0]))
+}
+
+/// Helper: Copy array from snapshot
+fn copy_array(arr: @Array<u8>) -> Array<u8> {
+    let mut result = ArrayTrait::new();
+    let mut i: u32 = 0;
+    while i < arr.len() {
+        result.append(*arr[i]);
+        i += 1;
+    };
+    result
 }
 
 /// Hash a pair of nodes using SHA-256d
 ///
-/// SHA-256d(a, b) = SHA256(SHA256(a || b))
+/// This is the standard Bitcoin/Zcash transaction merkle tree hash function:
+/// SHA-256d(a || b) = SHA-256(SHA-256(a || b))
 ///
-/// TODO: Implement when SHA-256 is ready
+/// #### Arguments
+/// * `left` - Left hash (32 bytes)
+/// * `right` - Right hash (32 bytes)
+///
+/// #### Returns
+/// * `Array<u8>` - Combined hash (32 bytes)
+///
+/// #### Reference
+/// Zcash Protocol Specification Section 7.1
 fn hash_pair(left: @Array<u8>, right: @Array<u8>) -> Array<u8> {
-    // Concatenate left and right
+    // Concatenate left and right (64 bytes total)
     let mut combined = ArrayTrait::new();
 
-    let mut i = 0;
-    loop {
-        if i >= left.len() {
-            break;
-        }
+    let mut i: u32 = 0;
+    while i < left.len() {
         combined.append(*left[i]);
         i += 1;
     };
 
-    let mut j = 0;
-    loop {
-        if j >= right.len() {
-            break;
-        }
+    let mut j: u32 = 0;
+    while j < right.len() {
         combined.append(*right[j]);
         j += 1;
     };
 
-    // TODO: Apply SHA-256d
-    // For now, return placeholder
-    combined
+    // Apply SHA-256d: SHA-256(SHA-256(combined))
+    sha256d(combined)
 }
 
 /// Validate transaction merkle root in block header
@@ -248,7 +262,7 @@ pub fn validate_sapling_root(
                 break;
             }
             let output = outputs[j];
-            tree.append(output.cmu)?;
+            tree.append(*output.cmu)?;
             j += 1;
         };
 
@@ -278,7 +292,7 @@ pub fn validate_sapling_root(
     };
 
     // Verify tree size matches
-    if tree.size() != *block.sapling_commitment_tree_size.into() {
+    if tree.size() != (*block.sapling_commitment_tree_size).into() {
         return Result::Err(
             ZcashError::ValidationError("Sapling tree size mismatch")
         );
@@ -296,7 +310,7 @@ pub fn validate_block_merkle_roots(
 ) -> Result<(), ZcashError> {
     // 1. Validate transaction merkle root
     // TODO: Extract transaction hashes from block
-    let tx_hashes = ArrayTrait::new();  // Placeholder
+    let tx_hashes: Array<Array<u8>> = ArrayTrait::new();  // Placeholder
     // validate_tx_merkle_root(header, tx_hashes.span())?;
 
     // 2. Validate Sapling commitment tree root
@@ -307,17 +321,89 @@ pub fn validate_block_merkle_roots(
 
 #[cfg(test)]
 mod tests {
-    use super::{compute_tx_merkle_root, SaplingTreeTrait, SAPLING_TREE_DEPTH};
+    use super::{compute_tx_merkle_root, hash_pair, SaplingTreeTrait, SAPLING_TREE_DEPTH};
+
+    fn create_test_hash(value: u8) -> Array<u8> {
+        let mut hash = ArrayTrait::new();
+        let mut i: u32 = 0;
+        while i < 32 {
+            hash.append(value);
+            i += 1;
+        };
+        hash
+    }
+
+    #[test]
+    fn test_hash_pair() {
+        let left = create_test_hash(0xAA);
+        let right = create_test_hash(0xBB);
+
+        let result = hash_pair(@left, @right);
+
+        // Result should be 32 bytes (SHA-256d output)
+        assert(result.len() == 32, 'Hash pair should be 32 bytes');
+    }
+
+    #[test]
+    fn test_single_transaction_merkle_root() {
+        let mut tx_hashes: Array<Array<u8>> = ArrayTrait::new();
+        tx_hashes.append(create_test_hash(0x01));
+
+        let result = compute_tx_merkle_root(tx_hashes.span());
+
+        assert(result.is_ok(), 'Should succeed');
+        let root = result.unwrap();
+
+        // Single transaction - root should equal the transaction hash
+        assert(root.len() == 32, 'Root should be 32 bytes');
+        assert(*root[0] == 0x01, 'Root should match input');
+    }
+
+    #[test]
+    fn test_two_transaction_merkle_root() {
+        let mut tx_hashes: Array<Array<u8>> = ArrayTrait::new();
+        tx_hashes.append(create_test_hash(0x01));
+        tx_hashes.append(create_test_hash(0x02));
+
+        let result = compute_tx_merkle_root(tx_hashes.span());
+
+        assert(result.is_ok(), 'Should succeed');
+        let root = result.unwrap();
+        assert(root.len() == 32, 'Root should be 32 bytes');
+    }
+
+    #[test]
+    fn test_odd_transaction_merkle_root() {
+        // Test with 3 transactions (odd number)
+        let mut tx_hashes: Array<Array<u8>> = ArrayTrait::new();
+        tx_hashes.append(create_test_hash(0x01));
+        tx_hashes.append(create_test_hash(0x02));
+        tx_hashes.append(create_test_hash(0x03));
+
+        let result = compute_tx_merkle_root(tx_hashes.span());
+
+        assert(result.is_ok(), 'Should succeed');
+        let root = result.unwrap();
+        assert(root.len() == 32, 'Root should be 32 bytes');
+    }
+
+    #[test]
+    fn test_empty_merkle_root() {
+        let tx_hashes: Array<Array<u8>> = ArrayTrait::new();
+        let result = compute_tx_merkle_root(tx_hashes.span());
+
+        assert(result.is_err(), 'Should fail for empty');
+    }
 
     #[test]
     fn test_sapling_tree_depth() {
-        assert!(SAPLING_TREE_DEPTH == 32, "Sapling tree should be depth 32");
+        assert(SAPLING_TREE_DEPTH == 32, 'Depth should be 32');
     }
 
     #[test]
     fn test_sapling_tree_initialization() {
         let root = ArrayTrait::new();
         let tree = SaplingTreeTrait::from_root(@root, 0);
-        assert!(tree.size() == 0, "New tree should have size 0");
+        assert(tree.size() == 0, 'New tree should have size 0');
     }
 }

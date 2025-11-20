@@ -8,6 +8,11 @@ edition = "2024_07"
 [dependencies]
 starknet = "2.8.2"
 
+# Alexandria standard library
+alexandria_math = "0.7.0"
+alexandria_bytes = "0.7.0"
+alexandria_data_structures = "0.7.0"
+
 [dev-dependencies]
 cairo_test = "2.8.2"
 

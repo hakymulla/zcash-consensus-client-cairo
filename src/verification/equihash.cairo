@@ -8,7 +8,7 @@
 ///
 /// Reference: librustzcash/components/equihash/src/verify.rs
 /// Spec: https://zips.z.cash/protocol/protocol.pdf#equihash
-
+/// Incomplete needs blake2b
 use crate::types::block_header::BlockHeader;
 use crate::utils::errors::ZcashError;
 use crate::crypto::blake2b::{Blake2b, Blake2bTrait};
@@ -123,16 +123,16 @@ pub fn initialize_equihash_state(
     personalization.append('W');
 
     // Append n (200) as little-endian u32
-    personalization.append((EQUIHASH_N & 0xFF) as u8);
-    personalization.append(((EQUIHASH_N >> 8) & 0xFF) as u8);
-    personalization.append(((EQUIHASH_N >> 16) & 0xFF) as u8);
-    personalization.append(((EQUIHASH_N >> 24) & 0xFF) as u8);
+    personalization.append((EQUIHASH_N & 0xFF).try_into().unwrap());
+    personalization.append(((EQUIHASH_N / 256) & 0xFF).try_into().unwrap());
+    personalization.append(((EQUIHASH_N / 65536) & 0xFF).try_into().unwrap());
+    personalization.append(((EQUIHASH_N / 16777216) & 0xFF).try_into().unwrap());
 
     // Append k (9) as little-endian u32
-    personalization.append((EQUIHASH_K & 0xFF) as u8);
-    personalization.append(((EQUIHASH_K >> 8) & 0xFF) as u8);
-    personalization.append(((EQUIHASH_K >> 16) & 0xFF) as u8);
-    personalization.append(((EQUIHASH_K >> 24) & 0xFF) as u8);
+    personalization.append((EQUIHASH_K & 0xFF).try_into().unwrap());
+    personalization.append(((EQUIHASH_K / 256) & 0xFF).try_into().unwrap());
+    personalization.append(((EQUIHASH_K / 65536) & 0xFF).try_into().unwrap());
+    personalization.append(((EQUIHASH_K / 16777216) & 0xFF).try_into().unwrap());
 
     // Initialize Blake2b with personalization
     // TODO: Use blake2b_personal when fully implemented
@@ -193,7 +193,9 @@ fn indices_before(node_a: @EquihashNode, node_b: @EquihashNode) -> bool {
     }
 
     // Indices are ordered if the first index of a is less than first of b
-    *node_a.indices[0] < *node_b.indices[0]
+    let a_span = node_a.indices.span();
+    let b_span = node_b.indices.span();
+    *a_span[0] < *b_span[0]
 }
 
 /// Check for duplicate indices between two nodes
@@ -310,7 +312,7 @@ pub fn verify_equihash_solution(
     // 2. Initialize Blake2b state
     // TODO: Serialize header properly (without solution field)
     let header_bytes = ArrayTrait::new();  // Placeholder
-    let state = initialize_equihash_state(@header_bytes, @header.nonce);
+    let state = initialize_equihash_state(@header_bytes, header.nonce);
 
     // 3. Build the tree recursively
     // TODO: Implement when Blake2b is complete
@@ -325,7 +327,7 @@ pub fn verify_equihash_solution(
 /// It's the most computationally expensive part of consensus validation.
 pub fn verify_block_equihash(header: @BlockHeader) -> Result<(), ZcashError> {
     // Parse the solution
-    let solution = match parse_equihash_solution(@header.solution) {
+    let solution = match parse_equihash_solution(header.solution) {
         Result::Ok(s) => s,
         Result::Err(e) => {
             return Result::Err(

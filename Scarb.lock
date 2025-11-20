@@ -2,5 +2,32 @@
 version = 1
 
 [[package]]
+name = "alexandria_bytes"
+version = "0.7.0"
+source = "registry+https://scarbs.xyz/"
+checksum = "sha256:1ebc31b29ba196bd6ec70cfa487561f39a1ff9043f97319f302b2083e132284e"
+dependencies = [
+ "alexandria_data_structures",
+ "alexandria_math",
+]
+
+[[package]]
+name = "alexandria_data_structures"
+version = "0.7.0"
+source = "registry+https://scarbs.xyz/"
+checksum = "sha256:7af20f90c16e71aa2d4b176d37b792eccf798e09b8c3ef370a68766f2db4824f"
+
+[[package]]
+name = "alexandria_math"
+version = "0.7.0"
+source = "registry+https://scarbs.xyz/"
+checksum = "sha256:2f634a878ad20377041649f0c63ffff8d7f01fe578e3666371dfb15d243b6822"
+
+[[package]]
 name = "zcash_light_client"
 version = "0.1.0"
+dependencies = [
+ "alexandria_bytes",
+ "alexandria_data_structures",
+ "alexandria_math",
+]
