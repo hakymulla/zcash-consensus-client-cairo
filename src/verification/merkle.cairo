@@ -10,6 +10,7 @@ use crate::types::block_header::BlockHeader;
 use crate::types::compact_block::{CompactBlock, CompactTx};
 use crate::utils::errors::ZcashError;
 use crate::crypto::sha256d;
+use alexandria_bytes::byte_array_ext::{ByteArrayTraitExt, ByteArrayIntoArrayU8};
 
 /// Transaction Merkle Tree Validation
 /// Uses SHA-256d (double SHA-256) like Bitcoin
@@ -301,6 +302,45 @@ pub fn validate_sapling_root(
     Result::Ok(())
 }
 
+/// Extract transaction hashes from CompactBlock
+///
+/// Converts CompactTx hashes from felt252 to Array<u8> (32 bytes)
+/// for merkle tree validation.
+///
+/// # Arguments
+/// * `block` - The compact block containing transactions
+///
+/// # Returns
+/// * `Array<Array<u8>>` - Array of 32-byte transaction hashes
+fn extract_tx_hashes(block: @CompactBlock) -> Array<Array<u8>> {
+    let mut tx_hashes = ArrayTrait::new();
+    let vtx = block.vtx.span();
+
+    let mut i: usize = 0;
+    loop {
+        if i >= vtx.len() {
+            break;
+        }
+
+        let tx = vtx[i];
+
+        // Convert felt252 → u256 → ByteArray → Array<u8>
+        let hash_u256: u256 = (*tx.hash).into();
+
+        // Create ByteArray and append u256
+        let mut byte_array: ByteArray = Default::default();
+        ByteArrayTraitExt::append_u256(ref byte_array, hash_u256);
+
+        // Convert ByteArray → Array<u8>
+        let hash_bytes: Array<u8> = byte_array.into();
+
+        tx_hashes.append(hash_bytes);
+        i += 1;
+    };
+
+    tx_hashes
+}
+
 /// Full merkle validation for a block
 pub fn validate_block_merkle_roots(
     header: @BlockHeader,
@@ -309,9 +349,8 @@ pub fn validate_block_merkle_roots(
     prev_sapling_size: u64,
 ) -> Result<(), ZcashError> {
     // 1. Validate transaction merkle root
-    // TODO: Extract transaction hashes from block
-    let tx_hashes: Array<Array<u8>> = ArrayTrait::new();  // Placeholder
-    // validate_tx_merkle_root(header, tx_hashes.span())?;
+    let tx_hashes = extract_tx_hashes(block);
+    validate_tx_merkle_root(header, tx_hashes.span())?;
 
     // 2. Validate Sapling commitment tree root
     validate_sapling_root(header, prev_sapling_root, prev_sapling_size, block)?;
