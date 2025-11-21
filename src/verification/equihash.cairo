@@ -11,7 +11,7 @@
 /// Incomplete needs blake2b
 use crate::types::block_header::BlockHeader;
 use crate::utils::errors::ZcashError;
-use crate::crypto::blake2b::{Blake2b, Blake2bTrait};
+use crate::crypto::blake2bnew::{Blake2b, Blake2bTrait};
 
 /// Equihash parameters for Zcash
 /// n = 200: Hash output size in bits
@@ -136,13 +136,15 @@ pub fn initialize_equihash_state(
 
     // Initialize Blake2b with personalization
     // TODO: Use blake2b_personal when fully implemented
-    let mut state = Blake2bTrait::new(HASH_OUTPUT_BYTES);
+    let mut state = Blake2bTrait::new(HASH_OUTPUT_BYTES.try_into().unwrap());
 
     // Update with header (everything except solution)
-    state.update(header_bytes);
+    let mut header_bytes = header_bytes.span();
+    state.update(ref header_bytes);
 
     // Update with nonce
-    state.update(nonce);
+    let mut nonce = nonce.span();
+    state.update(ref nonce);
 
     state
 }

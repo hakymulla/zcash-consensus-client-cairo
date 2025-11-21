@@ -54,38 +54,32 @@ pub struct Blake2b {
     buf_len: usize,
 }
 
+
 #[generate_trait]
-impl Blake2bImpl of Blake2bTrait {
+pub impl Blake2bImpl of Blake2bTrait {
     fn new(size: u8) -> Blake2b {
         assert!(size > 0 && size.into() <= OUT_BYTES);
-        let mut param = encode_params(size.into(), 0).span();
+        let mut param = encode_params(size, 0).span();
         let mut state = IV();
         let mut res_state = ArrayTrait::<u64>::new();
 
         let my_span = state;
         let mut index: usize = 0;
         let limit: usize = 8;
+        let mut length = param.len();
 
         for i in 0..limit {
             let curr_state = *my_span[i];
-            for _ in 0..limit {
-                if i!= 0 {
-                    param.pop_front().unwrap();
-                }
-            }
-
-            let loaded = load64(ref param);
-            let som = curr_state ^ loaded;
-            res_state.append(som);
+            let mut load64_param = param.slice(i*8, length);
+            let loaded = load64(ref load64_param);
+            length = length - 8;
+            res_state.append(curr_state ^ loaded);
             index = 0;
         }
 
         let mut buf: Array<u8> = ArrayTrait::new();
         let mut i = 0;
-        loop {
-            if i == 256 {
-                break;
-            }
+        while i != 256 {
             buf.append(0);
             i += 1;
         };
@@ -111,23 +105,19 @@ impl Blake2bImpl of Blake2bTrait {
                     self.buf = replace_at_index(self.buf, left+i, *m[i]).span();
                 }
                 self.buf_len += fill;
-                let i = 0;
-                for _ in 0..fill {
-                    if i != fill {
-                        m.pop_front().unwrap();
-                    }
-                }
+
+                m = m.slice(fill, m.len() - fill);
 
                 self.increment_counter(BLOCK_BYTES.into());
                 self.compress();
                 for i in 0..BLOCK_BYTES {
                     let val = *self.buf[i+BLOCK_BYTES];
-                    self.buf = replace_at_index(self.buf, i.into(), val.into()).span();
+                    self.buf = replace_at_index(self.buf, i, val).span();
                 }
                 self.buf_len -= BLOCK_BYTES;
             } else {
                 for i in 0..m.len() {
-                    self.buf = replace_at_index(self.buf, left+i, *m[i].into()).span();
+                    self.buf = replace_at_index(self.buf, left+i, *m[i]).span();
                 }
                 self.buf_len += m.len();
                 m = reset_span(m);
@@ -148,7 +138,7 @@ impl Blake2bImpl of Blake2bTrait {
             self.compress();
             for i in 0..BLOCK_BYTES {
                 let val = *self.buf[i+BLOCK_BYTES];
-                self.buf = replace_at_index(self.buf, i.into(), val.into()).span();
+                self.buf = replace_at_index(self.buf, i, val).span();
             }
             self.buf_len -= BLOCK_BYTES;
         }        
@@ -165,20 +155,19 @@ impl Blake2bImpl of Blake2bTrait {
         self.compress();
 
         let mut index: usize = 0;
-        let limit: usize = self.h.len();
+        let h_len: usize = self.h.len();
         let mut buf = buf.span();
         let mut buf_copy = ArrayTrait::<u8>::new();
 
-        for i in 0..limit {
-            for _ in 0..limit {
-                if i!= 0 {
-                    buf.pop_front().unwrap();
-                }
-            }
+        let mut length = buf.len();
+
+        for i in 0..h_len {
+            let mut buf = buf.slice(i*8, length);
+            length = length - 8;
 
             store64(ref buf, *self.h[i]);
             index = 0;
-            for i in 0..limit {
+            for i in 0..h_len {
                 buf_copy.append(*buf[i]);
             }
         }
@@ -199,12 +188,8 @@ impl Blake2bImpl of Blake2bTrait {
         let mut m = array![0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0].span();
         let mut v = VecTrait::<Felt252Vec, u64>::new();
         let mut i = 0;
-        loop {
-            if i == 16 {
-                break;
-            }
+        while i != 16 {
             v.push(0);
-
             i += 1;
         };
 
@@ -246,7 +231,7 @@ impl Blake2bImpl of Blake2bTrait {
 
         let new_limit: usize = 8;
         for i in 0..new_limit {
-            self.h = replace_at_index(self.h, i, (*self.h[i] ^ v[i].into() ^ v[i+8].into())).span();
+            self.h = replace_at_index(self.h, i, (*self.h[i] ^ v[i] ^ v[i+8])).span();
         }
     }
 
@@ -274,8 +259,7 @@ fn round(r: usize, ref v: Felt252Vec<u64>, ref m: Span<u64>) {
 }
 
 fn reset_span(mut m: Span<u8>) -> Span<u8> {
-    let len = m.len();
-    m = m.slice(len, 0);
+    m = m.slice(m.len(), 0);
     m
 }
 
@@ -286,8 +270,8 @@ fn g(r: u32, i: usize, a: usize, b: usize, c: usize, d: usize, ref v: Felt252Vec
     let mut v_c = v[c];
     let mut v_d = v[d];
     let sigma = SIGMA();
-    let sigma_r_i0 = *sigma.at(r.into()).at((2*i+0).into());
-    let sigma_r_i1 = *sigma.at(r.into()).at((2*i+1).into());
+    let sigma_r_i0 = *sigma.at(r).at(2*i+0);
+    let sigma_r_i1 = *sigma.at(r).at(2*i+1);
     let m_sigma_r_i0 = *m.at(sigma_r_i0);
     let m_sigma_r_i1 =  *m.at(sigma_r_i1);
 
@@ -326,9 +310,8 @@ fn load64(ref b: Span<u8> ) -> u64 {
     let mut v: u64 = 0;
     let l:usize = 8;
     for i in 0..l {
-        let res: u64 = shl((*b[i]).into(), (8*i).into()).try_into().unwrap();
-        let som = v | res;
-        v = som;
+        let res: u64 = shl((*b[i]).into(), (8*i).into());
+        v = v | res;
     }
     v
 }
@@ -338,8 +321,7 @@ fn store64(ref b: Span<u8>, v: u64) {
     for i in 0..b.len() {
         let w8 = w % 256;
         b = replace_at_index(b, i, w8.try_into().unwrap()).span();
-        let res = shr(w, 8);
-        w = res.try_into().unwrap();
+        w = shr(w, 8);
     }
 }
 
@@ -349,11 +331,7 @@ fn replace_at_index<T, +core::traits::Drop<T>, +core::traits::Copy<T>>
     let mut i = 0;
     let length = span.len();
 
-    loop {
-        if i >= length {
-            break;
-        }
-
+    while i != length {
         let current_value = *span.at(i);
 
         if i == index {
@@ -361,7 +339,6 @@ fn replace_at_index<T, +core::traits::Drop<T>, +core::traits::Copy<T>>
         } else {
             new_arr.append(current_value);
         }
-
         i += 1;
     };
 
