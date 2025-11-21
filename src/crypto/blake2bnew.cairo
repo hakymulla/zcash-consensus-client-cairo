@@ -400,4 +400,48 @@ mod tests {
         let byte = array_to_byte_array(out);
         assert_eq!(to_hex(@byte), "18ad1256d508a8ef55956431695300e9669e9df7315a43363e34b39ff28e4d7cd4f4ba8eb57fa9d7a6cd0b7af0f4049b5d433b62e7dca6b69aa319618bdb92e1")
     }
+
+     #[test]
+    fn test_finalize_0() {
+        let mut blake_state = Blake2bTrait::new(64);
+        let mut value = array![66, 108, 97, 107, 101, 50, 98, 53, 49, 50, 32, 97, 110, 100, 32, 66, 108, 97, 107, 101, 50, 115, 50, 53, 54, 32, 99, 97, 110, 32, 98, 101, 32, 117, 115, 101, 100, 32, 105, 110, 32, 116, 104, 101, 32, 102, 111, 108, 108, 111, 119, 105, 110, 103, 32, 119, 97, 121, 58].span();
+        
+        blake_state.update(ref value);
+        let out = blake_state.finalize();
+        let byte = array_to_byte_array(out);
+        assert_eq!(to_hex(@byte), "7402cec144ca5861962475fa88e654676387d1839ecbc239b495609ce85ae2e07e99bf879aa0b58d016e5052f62a079474281b6ecb172ceef8f906e9dd7c2a17")
+    }
+
+    #[test]
+    fn test_finalize_1() {
+        let mut blake_state = Blake2bTrait::new(64);
+        let mut value = array![67, 111, 110, 118, 101, 110, 105, 101, 110, 99, 101, 32, 119, 114, 97, 112, 112, 101, 114, 32, 116, 114, 97, 105, 116, 32, 99, 111, 118, 101, 114, 105, 110, 103, 32, 102, 117, 110, 99, 116, 105, 111, 110, 97, 108, 105, 116, 121, 32, 111, 102, 32, 99, 114, 121, 112, 116, 111, 103, 114, 97, 112, 104, 105, 99, 32, 104, 97, 115, 104, 32, 102, 117, 110, 99, 116, 105, 111, 110, 115, 32, 119, 105, 116, 104, 32, 102, 105, 120, 101, 100, 32, 111, 117, 116, 112, 117, 116, 32, 115, 105, 122, 101, 46].span();
+        
+        blake_state.update(ref value);
+        let out = blake_state.finalize();
+        let byte = array_to_byte_array(out);
+        assert_eq!(to_hex(@byte), "130b3cc98a479de1f0b1f46a46d081f738f75b9513f97dccf9e0d5942df4d519de95af834539cc5789e9673ef80bf15e8f2cd879a008bc97f6467947bb21b277")
+    }
+
+    #[test]
+    fn test_finalize_2() {
+        let mut blake_state = Blake2bTrait::new(64);
+        let mut value = array![67, 111, 114, 101, 32, 104, 97, 115, 104, 101, 114, 32, 115, 116, 97, 116, 101, 32, 111, 102, 32, 66, 76, 65, 75, 69, 50, 98, 32, 103, 101, 110, 101, 114, 105, 99, 32, 111, 118, 101, 114, 32, 111, 117, 116, 112, 117, 116, 32, 115, 105, 122, 101, 46].span();
+        
+        blake_state.update(ref value);
+        let out = blake_state.finalize();
+        let byte = array_to_byte_array(out);
+        assert_eq!(to_hex(@byte), "211ea8469133078febe9797299255c6c55459be9629186ced46419a5c321421608326ba3a72bafe8441511bed2879857ad77fc30e969e07d81f88f7e0cf447b6")
+    }
+
+    #[test]
+    fn test_finalize_3() {
+        let mut blake_state = Blake2bTrait::new(64);
+        let mut value = array![97, 32, 110, 101, 119, 32, 99, 111, 110, 116, 101, 120, 116, 32, 119, 105, 116, 104, 32, 116, 104, 101, 32, 102, 117, 108, 108, 32, 115, 101, 116, 32, 111, 102, 32, 115, 101, 113, 117, 101, 110, 116, 105, 97, 108, 45, 109, 111, 100, 101].span();
+        
+        blake_state.update(ref value);
+        let out = blake_state.finalize();
+        let byte = array_to_byte_array(out);
+        assert_eq!(to_hex(@byte), "2bd5ffb1b501ebd836fccea8fe8d6e315265591eb3a1dc8253c390ab553437db6922996dc9933cee57595f235ec63004bf4387626326bad026640db136bd24a8")
+    }
 }
