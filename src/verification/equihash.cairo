@@ -139,15 +139,14 @@ pub fn initialize_equihash_state(
     let mut state = Blake2bTrait::new(HASH_OUTPUT_BYTES.try_into().unwrap());
 
     // Update with header (everything except solution)
-    let mut header_bytes = header_bytes.span();
-    state.update(ref header_bytes);
+    state.update(header_bytes.span());
 
     // Update with nonce
-    let mut nonce = nonce.span();
-    state.update(ref nonce);
+    state.update(nonce.span());
 
     state
 }
+
 
 /// Generate hash for a specific index
 ///
@@ -159,9 +158,16 @@ fn generate_index_hash(
     base_state: @Blake2b,
     index: u32
 ) -> Array<u8> {
-    // TODO: Implement when Blake2b is complete
-    // For now, return empty hash
-    ArrayTrait::new()
+    // TODO: is indices_per_hash_output = 512 / n correct
+    let indices_per_hash_output = 512 / EQUIHASH_N;
+    let i = index / indices_per_hash_output;
+    let mut lei = ArrayTrait::<u8>::new();
+    lei.append((i & 0xFF).try_into().unwrap());
+
+    let mut state = base_state.clone();
+    state.update(lei.span());
+
+    state.finalize()
 }
 
 /// Check if two nodes have a collision in the first `len` bytes
@@ -175,10 +181,7 @@ fn has_collision(
     }
 
     let mut i = 0;
-    loop {
-        if i >= collision_len {
-            break;
-        }
+    while i != collision_len{
         if *node_a.hash[i] != *node_b.hash[i] {
             return false;
         }
@@ -204,16 +207,9 @@ fn indices_before(node_a: @EquihashNode, node_b: @EquihashNode) -> bool {
 fn has_duplicate_indices(node_a: @EquihashNode, node_b: @EquihashNode) -> bool {
     // Check if any index appears in both nodes
     let mut i = 0;
-    loop {
-        if i >= node_a.indices.len() {
-            break;
-        }
-
+    while i != node_a.indices.len() {
         let mut j = 0;
-        loop {
-            if j >= node_b.indices.len() {
-                break;
-            }
+        while j !=  node_b.indices.len() {
 
             if *node_a.indices[i] == *node_b.indices[j] {
                 return true;  // Found duplicate
@@ -267,10 +263,7 @@ fn combine_nodes(
         node_b.hash.len()
     };
 
-    loop {
-        if i >= max_len {
-            break;
-        }
+    while i != max_len {
         combined_hash.append(*node_a.hash[i] ^ *node_b.hash[i]);
         i += 1;
     };
@@ -278,10 +271,7 @@ fn combine_nodes(
     // Merge indices (preserving order)
     let mut combined_indices = node_a.indices.clone();
     let mut j = 0;
-    loop {
-        if j >= node_b.indices.len() {
-            break;
-        }
+    while j != node_b.indices.len() {
         combined_indices.append(*node_b.indices[j]);
         j += 1;
     };
